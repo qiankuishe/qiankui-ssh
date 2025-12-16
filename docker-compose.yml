@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  qiankui-ssh:
+    container_name: qiankui-ssh
+    image: ghcr.io/qiankuishe/qiankui-ssh:main
+    # 如果要本地构建，取消下面的注释并注释上面的 image
+    # build: .
+    ports:
+      - "8888:8888"
+    environment:
+      - QKSSH_DEBUG=false
+      - QKSSH_MAXCONN=100
+      - TZ=Asia/Shanghai
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8888/" ]
+      interval: 30s
+      timeout: 3s
+      retries: 3

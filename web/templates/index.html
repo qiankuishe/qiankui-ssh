@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Qiankui SSH - 千葵终端</title>
+    <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
+    <link href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+        referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+    <!-- 背景装饰 -->
+    <div class="bg-decoration">
+        <img src="/static/img/favicon.svg" class="bg-logo bg-logo-1" alt="">
+        <img src="/static/img/favicon.svg" class="bg-logo bg-logo-2" alt="">
+        <img src="/static/img/favicon.svg" class="bg-logo bg-logo-3" alt="">
+    </div>
+
+    <!-- GitHub 链接 - 顶部中间 -->
+    <div class="github-header">
+        <a href="https://github.com/qiankuishe/qiankui-ssh" target="_blank" class="github-link"
+            rel="noopener noreferrer">
+            <i class="fab fa-github"></i>
+            <span>GitHub</span>
+        </a>
+    </div>
+
+    <!-- 主容器 -->
+    <div class="main-container">
+        <!-- 连接表单 -->
+        <div class="form-container" id="formContainer">
+            <div class="logo">
+                <h1 class="logo-text">Qiankui SSH</h1>
+                <p class="logo-subtitle">千葵终端 · 轻量快速优雅</p>
+            </div>
+
+            <form id="connectForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="hostname">
+                            <i class="fas fa-server"></i> 主机地址
+                        </label>
+                        <input type="text" id="hostname" name="hostname" placeholder="例如: 192.168.1.100"
+                            value="{{.Hostname}}" required autocomplete="off">
+                    </div>
+                    <div class="form-group form-group-small">
+                        <label for="port">
+                            <i class="fas fa-plug"></i> 端口
+                        </label>
+                        <input type="number" id="port" name="port" placeholder="22"
+                            value="{{if .Port}}{{.Port}}{{else}}22{{end}}" min="1" max="65535">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="username">
+                            <i class="fas fa-user"></i> 用户名
+                        </label>
+                        <input type="text" id="username" name="username" placeholder="例如: root"
+                            value="{{if .Username}}{{.Username}}{{else}}root{{end}}" required autocomplete="off">
+                    </div>
+                    <div class="form-group">
+                        <label for="password">
+                            <i class="fas fa-key"></i> 密码
+                        </label>
+                        <input type="password" id="password" name="password" placeholder="输入密码" value="{{.Password}}"
+                            autocomplete="new-password">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="privatekey">
+                        <i class="fas fa-file-code"></i> 私钥 (可选)
+                    </label>
+                    <div class="file-input-wrapper">
+                        <input type="file" id="privatekeyFile" accept=".pem,.key,.ppk">
+                        <button type="button" class="btn btn-secondary"
+                            onclick="document.getElementById('privatekeyFile').click()">
+                            <i class="fas fa-folder-open"></i> 选择文件
+                        </button>
+                        <span id="fileName" class="file-name">未选择文件</span>
+                    </div>
+                    <textarea id="privatekey" name="privatekey" placeholder="或直接粘贴私钥内容..." rows="3"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="passphrase">
+                        <i class="fas fa-lock"></i> 私钥密码 (如需要)
+                    </label>
+                    <input type="password" id="passphrase" name="passphrase" placeholder="私钥的密码短语"
+                        autocomplete="new-password">
+                </div>
+
+                <div class="button-group">
+                    <button type="submit" class="btn btn-primary" id="connectBtn">
+                        <i class="fas fa-terminal"></i> 连接
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="linkBtn">
+                        <i class="fas fa-link"></i> 生成链接
+                    </button>
+                </div>
+
+                <!-- 快速链接显示 -->
+                <div class="quick-link" id="quickLink" style="display: none;">
+                    <input type="text" id="linkInput" readonly>
+                    <button type="button" class="btn btn-icon" onclick="copyLink()">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- 终端容器 -->
+        <div class="terminal-container" id="terminalContainer" style="display: none;">
+            <div class="terminal-header">
+                <div class="terminal-title">
+                    <span id="terminalTitle">Qiankui SSH</span>
+                </div>
+                <div class="terminal-controls">
+                    <button class="ctrl-btn" id="fullscreenBtn" title="全屏">
+                        <i class="fas fa-expand"></i>
+                    </button>
+                    <button class="ctrl-btn" id="disconnectBtn" title="断开连接">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div id="terminal"></div>
+        </div>
+
+        <!-- 状态消息 -->
+        <div class="status-message" id="statusMessage"></div>
+    </div>
+
+    <!-- 加载动画 -->
+    <div class="loading-overlay" id="loadingOverlay" style="display: none;">
+        <div class="loading-spinner">
+            <div class="spinner-circle"></div>
+            <p>正在连接...</p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.min.js"></script>
+    <script src="/static/js/terminal.js"></script>
+
+    <script>
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function () {
+            // 私钥文件选择
+            document.getElementById('privatekeyFile').addEventListener('change', function (e) {
+                const file = e.target.files[0];
+                if (file) {
+                    document.getElementById('fileName').textContent = file.name;
+                    const reader = new FileReader();
+                    reader.onload = function (e) {
+                        document.getElementById('privatekey').value = e.target.result;
+                    };
+                    reader.readAsText(file);
+                }
+            });
+
+            // URL 参数自动连接
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.has('hostname') && urlParams.has('username')) {
+                if (urlParams.has('password') || urlParams.has('privatekey')) {
+                    setTimeout(() => {
+                        document.getElementById('connectForm').dispatchEvent(new Event('submit'));
+                    }, 500);
+                }
+            }
+        });
+
+        // 生成快速链接
+        document.getElementById('linkBtn').addEventListener('click', function () {
+            const hostname = document.getElementById('hostname').value;
+            const port = document.getElementById('port').value || '22';
+            const username = document.getElementById('username').value || 'root';
+            const password = document.getElementById('password').value;
+
+            if (!hostname) {
+                showStatus('请先输入主机地址', 'error');
+                return;
+            }
+
+            let link = `${window.location.origin}/?hostname=${encodeURIComponent(hostname)}&port=${port}&username=${encodeURIComponent(username)}`;
+            if (password) {
+                link += `&password=${btoa(password)}`;
+            }
+
+            document.getElementById('linkInput').value = link;
+            document.getElementById('quickLink').style.display = 'flex';
+        });
+
+        // 复制链接
+        function copyLink() {
+            const linkInput = document.getElementById('linkInput');
+            linkInput.select();
+            navigator.clipboard.writeText(linkInput.value).then(() => {
+                showStatus('链接已复制到剪贴板', 'success');
+            });
+        }
+
+        // 显示状态消息
+        function showStatus(message, type = 'info') {
+            const statusEl = document.getElementById('statusMessage');
+            statusEl.textContent = message;
+            statusEl.className = 'status-message ' + type;
+            statusEl.style.display = 'block';
+            setTimeout(() => {
+                statusEl.style.display = 'none';
+            }, 3000);
+        }
+    </script>
+</body>
+
+</html>
